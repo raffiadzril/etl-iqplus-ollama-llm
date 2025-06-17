@@ -37,20 +37,6 @@ services:
       - SE_NODE_SESSION_TIMEOUT=60
     networks:
       - etl_network
-
-  # Ollama LLM Service
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c"]
-    command: "ollama serve"
-    networks:
-      - etl_network
-
   # Extraction Service
   extraction-iqplus:
     build:
@@ -166,6 +152,5 @@ networks:
 volumes:
   postgres_data:
   airflow_data:
-  ollama_data:
   mongodb_data:
   shared_data:
