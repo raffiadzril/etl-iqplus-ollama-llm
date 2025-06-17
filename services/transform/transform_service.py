@@ -36,24 +36,31 @@ def analyze_sentiment_together_ai(headline, content):
     
     headers = {
         "Authorization": f"Bearer {TOGETHER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+        "Content-Type": "application/json"    }
     
     prompt = f"""
-Berikut adalah berita pasar modal:
+Anda adalah analis berita pasar modal Indonesia yang profesional. Analisis berita berikut dan berikan output dalam Bahasa Indonesia yang baik dan benar.
+
+Berita pasar modal:
 
 Judul: {headline}
 
 Isi:
 {content}
 
-Tolong analisis berita ini dan berikan output dalam format JSON seperti ini:
+INSTRUKSI PENTING:
+- Gunakan HANYA Bahasa Indonesia yang baik dan benar
+- Reasoning harus menjelaskan alasan sentimen dengan jelas dalam Bahasa Indonesia
+- Summary harus merangkum berita secara lengkap dalam Bahasa Indonesia
+- Jangan gunakan bahasa Inggris sama sekali
+
+Berikan output dalam format JSON seperti ini:
 
 {{
   "sentiment": "<positive/negative/neutral>",
   "confidence": <nilai antara 0 dan 1>,
-  "reasoning": "<alasan singkat mengapa sentimen ini>",
-  "summary": "<ringkasan lengkap dari berita tanpa dipotong, maksimal 3 kalimat>",
+  "reasoning": "<alasan lengkap mengapa sentimen ini dalam Bahasa Indonesia>",
+  "summary": "<ringkasan lengkap berita dalam Bahasa Indonesia, maksimal 3 kalimat>",
   "tickers": ["<kode saham jika ada>"]
 }}
 
@@ -63,7 +70,7 @@ Output hanya JSON. Jangan tambahkan penjelasan apa pun di luar itu.
     body = {
         "model": "meta-llama/Llama-3-8b-chat-hf",
         "messages": [
-            {"role": "system", "content": "Kamu adalah analis berita pasar modal yang membantu memberikan ringkasan dan analisis sentimen."},
+            {"role": "system", "content": "Anda adalah analis berita pasar modal Indonesia yang profesional. Selalu gunakan Bahasa Indonesia yang baik dan benar dalam setiap analisis. Jangan pernah menggunakan bahasa Inggris dalam reasoning dan summary."},
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 1024,
