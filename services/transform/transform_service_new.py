@@ -140,11 +140,10 @@ def analyze_sentiment_fallback(headline, content):
     if ticker_match:
         tickers = [ticker_match.group(1)]
     
-    # Ringkasan 2-3 kalimat dari isi konten (lebih natural)
-    summary = re.sub(r'\s+', ' ', content.strip())  # Hilangkan newline berlebihan
-    summary_sentences = re.split(r'(?<=[.!?]) +', summary)
-    summary = ' '.join(summary_sentences[:3])  # Maksimal 3 kalimat
-
+    summary = f"Berita tentang {tickers[0] if tickers else 'perusahaan'} dengan sentimen {sentiment}."
+    if len(content) > 100:
+        summary += f" {content[:100]}..."
+    
     return {
         "sentiment": sentiment,
         "confidence": confidence,
@@ -161,7 +160,7 @@ def get_raw_news_from_mongo(date_str=None):
     
     if date_str:
         # Filter berdasarkan tanggal
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date() - timedelta(days=1)  # Ambil berita dari hari sebelumnya
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         # Query MongoDB untuk berita dari tanggal tersebut
         query = {}  # Bisa ditambahkan filter tanggal jika diperlukan
     else:

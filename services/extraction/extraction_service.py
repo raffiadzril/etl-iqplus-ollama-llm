@@ -275,7 +275,6 @@ def save_to_mongodb(berita_list):
     client = MongoClient(MONGO_URI)
     db = client[MONGO_DB]
     collection = db[MONGO_COLLECTION]
-    
     inserted = 0
     for berita in berita_list:
         # Cek duplikasi
@@ -284,7 +283,9 @@ def save_to_mongodb(berita_list):
             logger.info(f"🔁 Berita duplikat dilewati: {berita['headline']}")
             continue
             
-        collection.insert_one(berita)
+        # Buat copy untuk insert ke MongoDB (menghindari ObjectId masuk ke original dict)
+        berita_copy = berita.copy()
+        collection.insert_one(berita_copy)
         inserted += 1
         logger.info(f"💾 Berhasil menyimpan: {berita['headline']}")
     

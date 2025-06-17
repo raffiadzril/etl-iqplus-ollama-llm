@@ -30,10 +30,10 @@ def call_extraction_service(**kwargs):
     """Panggil extraction service untuk scraping berita dengan debugging detail"""
     target_date = kwargs.get('target_date', None)
     if not target_date:
-        # Default ke hari ini untuk testing, bisa diubah ke kemarin untuk production
-        today = datetime.now(JAKARTA_TZ).date()
-        target_date = today.strftime("%Y-%m-%d")
-        logger.info(f"📅 Tidak ada target_date yang diberikan, menggunakan hari ini: {target_date}")
+        # Default ke kemarin untuk production (tanggal berita yang akan diextract)
+        yesterday = (datetime.now(JAKARTA_TZ) - timedelta(days=1)).date()
+        target_date = yesterday.strftime("%Y-%m-%d")
+        logger.info(f"📅 Tidak ada target_date yang diberikan, menggunakan kemarin: {target_date}")
     
     payload = {"date": target_date}
     

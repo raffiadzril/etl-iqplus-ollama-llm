@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Transform Service untuk IQPlus Financial News
-Bertugas menganalisis sentimen dengan Together AI dan menyimpan hasil ke JSON
+Bertugas menganalisis sentimen dengan Ollama dan menyimpan hasil ke JSON
 """
 
 from flask import Flask, jsonify, request
@@ -116,7 +116,7 @@ Output hanya JSON. Jangan tambahkan penjelasan apa pun di luar itu.
 
 def analyze_sentiment_fallback(headline, content):
     """Analisis sentimen sederhana tanpa LLM"""
-    positive_words = ['naik', 'tumbuh', 'meningkat', 'profit', 'laba', 'ekspansi', 'investasi', 'positif', 'bagus', 'untung', 'capex', 'bangun', 'baru', 'dividen']
+    positive_words = ['naik', 'tumbuh', 'meningkat', 'profit', 'laba', 'ekspansi', 'investasi', 'positif', 'bagus', 'untung', 'capex', 'bangun', 'baru']
     negative_words = ['turun', 'merosot', 'rugi', 'loss', 'negatif', 'buruk', 'gagal', 'krisis', 'penurunan', 'defisit']
     
     text = f"{headline} {content}".lower()
@@ -140,11 +140,10 @@ def analyze_sentiment_fallback(headline, content):
     if ticker_match:
         tickers = [ticker_match.group(1)]
     
-    # Ringkasan 2-3 kalimat dari isi konten (lebih natural)
-    summary = re.sub(r'\s+', ' ', content.strip())  # Hilangkan newline berlebihan
-    summary_sentences = re.split(r'(?<=[.!?]) +', summary)
-    summary = ' '.join(summary_sentences[:3])  # Maksimal 3 kalimat
-
+    summary = f"Berita tentang {tickers[0] if tickers else 'perusahaan'} dengan sentimen {sentiment}."
+    if len(content) > 100:
+        summary += f" {content[:100]}..."
+    
     return {
         "sentiment": sentiment,
         "confidence": confidence,
@@ -161,7 +160,7 @@ def get_raw_news_from_mongo(date_str=None):
     
     if date_str:
         # Filter berdasarkan tanggal
-        target_date = datetime.strptime(date_str, "%Y-%m-%d").date() - timedelta(days=1)  # Ambil berita dari hari sebelumnya
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         # Query MongoDB untuk berita dari tanggal tersebut
         query = {}  # Bisa ditambahkan filter tanggal jika diperlukan
     else:
@@ -184,74 +183,69 @@ def save_processed_to_json_and_mongo(processed_list, date_str):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
     with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(processed_list, f, ensure_ascii=False, indent=2, default=str)
+        json.dump(processed_list, f, ensure_ascii=False, indent=2)
     
-    logger.info(f"💾 Hasil disimpan ke file: {output_file}")
+    logger.info(f"💾 Hasil processing disimpan ke: {output_file}")
     
     # Simpan ke MongoDB
     client = MongoClient(MONGO_URI)
     db = client[MONGO_DB]
     collection = db[MONGO_COLLECTION_PROCESSED]
     
-    # Tambahkan timestamp processing
-    for item in processed_list:
-        item['processed_at'] = datetime.now(JAKARTA_TZ).isoformat()
-    
-    # Insert ke MongoDB (hapus _id string sebelum insert)
-    items_for_mongo = []
-    for item in processed_list:
-        item_copy = item.copy()
-        if '_id' in item_copy and isinstance(item_copy['_id'], str):
-            del item_copy['_id']  # Biarkan MongoDB generate _id baru
-        items_for_mongo.append(item_copy)
-    
-    if items_for_mongo:
-        result = collection.insert_many(items_for_mongo)
-        inserted_count = len(result.inserted_ids)
-        logger.info(f"💾 Berhasil simpan {inserted_count} berita ke MongoDB collection: {MONGO_COLLECTION_PROCESSED}")
-    else:
-        inserted_count = 0
-        logger.warning("⚠️ Tidak ada data untuk disimpan ke MongoDB")
+    inserted = 0
+    for processed in processed_list:
+        # Cek duplikasi
+        filter_criteria = {"headline": processed["headline"], "published_at": processed["published_at"]}
+        if collection.find_one(filter_criteria):
+            logger.info(f"🔁 Data duplikat dilewati: {processed['headline']}")
+            continue
+            
+        # Remove _id dari raw data jika ada
+        if '_id' in processed:
+            del processed['_id']
+            
+        processed["processed_at"] = datetime.now(JAKARTA_TZ).isoformat()
+        collection.insert_one(processed)
+        inserted += 1
+        logger.info(f"💾 Berhasil simpan ke MongoDB: {processed['headline']}")
     
     client.close()
+    logger.info(f"🏁 Total data berhasil disimpan ke MongoDB: {inserted} dari {len(processed_list)}")
     
-    return output_file, inserted_count
+    return output_file, inserted
 
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "service": "transform-llm",
-        "timestamp": datetime.now(JAKARTA_TZ).isoformat(),
-        "llm_provider": "Together AI"
-    })
+    return jsonify({"status": "healthy", "service": "transform-llm"})
 
 @app.route('/transform', methods=['POST'])
 def transform_news():
-    """Endpoint utama untuk transformasi berita"""
+    """Endpoint untuk transformasi berita dengan LLM"""
     try:
         data = request.get_json()
-        date_str = data.get('date', datetime.now(JAKARTA_TZ).strftime("%Y-%m-%d"))
+        date_str = data.get('date', None)
+        
+        if not date_str:
+            # Default ke kemarin
+            yesterday = (datetime.now(JAKARTA_TZ) - timedelta(days=1)).date()
+            date_str = yesterday.strftime("%Y-%m-%d")
         
         logger.info(f"🎯 Mulai transformasi untuk tanggal: {date_str}")
         
-        # Ambil data dari MongoDB
+        # Ambil berita mentah dari MongoDB
         raw_news_list = get_raw_news_from_mongo(date_str)
         
         if not raw_news_list:
+            logger.warning("🚫 Tidak ada berita mentah untuk ditransformasi")
             return jsonify({
-                "status": "success",
-                "message": "Tidak ada berita untuk diproses",
-                "processed_count": 0,
+                "status": "warning",
+                "message": "Tidak ada berita mentah untuk ditransformasi",
                 "date": date_str
             })
         
-        logger.info(f"📄 Ditemukan {len(raw_news_list)} berita untuk diproses")
-        
         processed_list = []
-        
-        for berita in raw_news_list:
+          for berita in raw_news_list:
             try:
                 logger.info(f"🔄 Memproses: {berita['headline']}")
                 
@@ -289,8 +283,8 @@ def transform_news():
             "message": f"Berhasil transformasi {len(processed_list)} berita",
             "processed_count": len(processed_list),
             "inserted_count": inserted_count,
-            "output_file": output_file,
-            "date": date_str
+            "date": date_str,
+            "output_file": output_file
         })
         
     except Exception as e:
@@ -310,8 +304,7 @@ def transform_from_file():
         # Baca dari file JSON
         with open(input_file, 'r', encoding='utf-8') as f:
             raw_news_list = json.load(f)
-        
-        logger.info(f"📂 Memuat {len(raw_news_list)} berita dari file: {input_file}")
+          logger.info(f"📂 Memuat {len(raw_news_list)} berita dari file: {input_file}")
         
         processed_list = []
         
@@ -359,11 +352,8 @@ def transform_from_file():
         })
         
     except Exception as e:
-        logger.error(f"❌ Error dalam transformasi file: {e}")
+        logger.error(f"❌ Error dalam transformasi dari file: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    logger.info("🚀 Transform Service dengan Together AI dimulai...")
-    logger.info(f"🔗 Together AI API URL: {TOGETHER_API_URL}")
-    logger.info(f"📊 MongoDB URI: {MONGO_URI}")
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=5001, debug=True)
