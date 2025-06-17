@@ -1,15 +1,38 @@
-# ETL IQPlus Financial News DAG
+# ETL IQPlus Financial News - Microservices Pipeline
 
-Folder ini berisi pipeline ETL (Extract, Transform, Load) untuk berita IQPlus:
-- Extract: Scraping berita dari IQPlus (menggunakan Selenium)
-- Transform: Analisis berita menggunakan LLM (LM Studio) dari modul financial-news-analyzer-main
-- Load: Simpan hasil ke MongoDB (host.docker.internal), timezone Asia/Jakarta, tanggal dimundurkan 2 hari
+Pipeline ETL (Extract, Transform, Load) modern untuk scraping dan analisis berita finansial IQPlus dengan arsitektur **microservices** dan **Docker Operators**.
 
-Pipeline ini berjalan di Docker dan dapat diintegrasikan dengan Airflow.
+## 🚀 Quick Start
 
-Struktur:
-- dags/etl_iqplus_financial_dag.py  # DAG utama
-- requirements.txt                  # Dependensi Python
-- Dockerfile                        # Image Airflow + Selenium + LM Studio client
+```powershell
+# Deploy complete pipeline
+.\deploy_docker_operators.ps1
 
-Pastikan LM Studio API berjalan di localhost:1234 dan MongoDB dapat diakses dari container.
+# Manual testing
+.\test_complete_pipeline.ps1
+```
+
+## 📁 Architecture
+
+```
+Extract Service → Transform Service → Load Service
+     ↓                 ↓                ↓
+  Raw News      →  Processed News  → Final News + Analytics
+```
+
+## 📚 Documentation
+
+- **[Docker Operators Guide](README_DOCKER_OPERATORS.md)** - Complete setup with Docker Operators
+- **[Microservices Guide](README_MICROSERVICES.md)** - Service architecture details
+
+## 🔗 Access Points
+
+- **Airflow UI**: http://localhost:8081 (admin/admin)
+- **Services**: Extract (5000), Transform (5001), Load (5002)  
+- **MongoDB**: localhost:27017
+
+## 🧪 Testing
+
+- `test_complete_pipeline.ps1` - Full pipeline test
+- `test_docker_operators.py` - Container testing
+- `monitor_data.py` - Data validation

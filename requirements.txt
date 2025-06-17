@@ -1,9 +1,7 @@
-# requirements.txt untuk ETL IQPlus Financial
+# Requirements untuk testing dan monitoring tools ETL IQPlus
+# Setiap service memiliki requirements.txt sendiri di services/*/requirements.txt
 
-apache-airflow==2.8.1
-selenium>=4.10.0
-pymongo>=4.0.0
+# For testing scripts
 requests>=2.28.0
-python-dateutil>=2.8.2
+pymongo>=4.0.0
 pytz>=2023.3
-tzlocal>=4.0.0
